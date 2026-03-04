@@ -95,34 +95,7 @@ export const getMyReviews = async (req, res) => {
 };
 
 
-/* -----------------------------------------
-   OBTENER RESEÑAS POR SUCURSAL
-------------------------------------------*/
-export const getBranchReviews = async (req, res) => {
-    try {
-        const { branchId } = req.params;
 
-        const reviews = await Review.find({
-            branch: branchId,
-            isDeleted: false
-        })
-            .populate('customer', 'UserName UserSurname')
-            .populate('order', 'estado total')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            data: reviews
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener reseñas de la sucursal',
-            error: error.message
-        });
-    }
-};
 
 
 /* -----------------------------------------

@@ -4,7 +4,6 @@ import { Router } from 'express';
 import {
     createReview,
     getMyReviews,
-    getBranchReviews,
     updateReview,
     deleteReview
 } from './review.controller.js';
@@ -62,16 +61,6 @@ router.put(
 
 
 
-/* =========================================
-   PERSONAL / ADMIN
-========================================= */
 
-// Ver reseñas por sucursal
-router.get(
-    '/branch/:branchId',
-    validateJWT,
-    hasRole('EMPLOYEE', 'BRANCH_ADMIN', 'PLATFORM_ADMIN'),
-    getBranchReviews
-);
 
 export default router;
