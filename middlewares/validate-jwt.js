@@ -6,8 +6,6 @@ import User from '../src/User/user.model.js';
 export const validateJWT = async (req, res, next) => {
 
     try {
-
-        // Obtener token
         const token =
             req.header('x-token') ||
             req.header('Authorization')?.replace('Bearer ', '');
@@ -18,11 +16,17 @@ export const validateJWT = async (req, res, next) => {
             });
         }
 
-        // Verificar token
-        const { uid } = jwt.verify(token, process.env.SECRET_KEY);
+        const decoded = jwt.verify(token, process.env.SECRET_KEY);
+        const userId = decoded.uid || decoded.sub;
 
-        // Buscar usuario
-        const user = await User.findById(uid);
+        if (!userId) {
+            return res.status(401).json({
+                message: 'Token inválido: sin identificador de usuario'
+            });
+        }
+
+        // Buscar usuario en MongoDB
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(401).json({
@@ -30,26 +34,18 @@ export const validateJWT = async (req, res, next) => {
             });
         }
 
-        // Validaciones de seguridad
         if (user.UserStatus === 'INACTIVE') {
-            return res.status(401).json({
-                message: 'Usuario inactivo'
-            });
+            return res.status(401).json({ message: 'Usuario inactivo' });
         }
 
         if (user.deletedAt) {
-            return res.status(401).json({
-                message: 'Usuario eliminado'
-            });
+            return res.status(401).json({ message: 'Usuario eliminado' });
         }
 
-        // Adjuntar usuario a la request
         req.user = user;
-
         next();
 
     } catch (error) {
-
         return res.status(401).json({
             message: 'Token no válido o expirado'
         });
