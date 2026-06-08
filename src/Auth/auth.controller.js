@@ -2,19 +2,18 @@ import User from '../User/user.model.js';
 import { generateJWT } from '../../helpers/generate-jwt.js';
 import { sendTokenEmail } from '../../helpers/email.helper.js';
 
-// REGISTER (Crear cuenta)
+// REGISTER — Solo permite rol CLIENT
 export const register = async (req, res) => {
     try {
         const data = req.body;
+
+        // Forzar rol CLIENT independientemente de lo que envíe el body
+        data.role = 'CLIENT';
+
         const user = new User(data);
-        
-        // Guardar usuario (isVerified por defecto es false)
         await user.save();
 
-        // Generar token de verificación
         const token = await generateJWT(user._id, user.UserEmail, user.role);
-
-        // Enviar correo de verificación
         await sendTokenEmail(user.UserEmail, token);
 
         res.status(201).json({
@@ -22,25 +21,47 @@ export const register = async (req, res) => {
             message: 'Usuario registrado. Por favor, verifica tu correo para activar tu cuenta.',
         });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: 'El correo electrónico ya está registrado',
+                error: 'DUPLICATE_EMAIL'
+            });
+        }
         res.status(500).json({ success: false, error: error.message });
     }
 };
 
-// LOGIN (Iniciar sesión)
+// LOGIN — Solo permite usuarios con rol CLIENT
 export const login = async (req, res) => {
     try {
         const { UserEmail, password } = req.body;
-        const user = await User.findOne({ UserEmail });
+
+        const user = await User.findOne({
+            UserEmail,
+            UserStatus: 'ACTIVE',
+            deletedAt: null
+        });
 
         if (!user || !(await user.comparePassword(password))) {
-            return res.status(400).json({ message: 'Credenciales inválidas' });
+            return res.status(400).json({
+                success: false,
+                message: 'Credenciales inválidas'
+            });
         }
 
-        // Verifica si la cuenta esta activa
         if (!user.isVerified) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                message: 'Por favor, verifica tu cuenta en tu correo electrónico antes de iniciar sesión.' 
+                message: 'Por favor, verifica tu cuenta en tu correo electrónico antes de iniciar sesión.'
+            });
+        }
+
+        // Solo CLIENTs pueden acceder a la app del cliente
+        if (user.role !== 'CLIENT') {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Esta aplicación es exclusiva para clientes.'
             });
         }
 
@@ -56,9 +77,9 @@ export const login = async (req, res) => {
     }
 };
 
+// VERIFY EMAIL
 export const verifyEmail = async (req, res) => {
     try {
-        // El token viene del middleware validateJWT
         const user = req.user;
 
         if (user.isVerified) {
