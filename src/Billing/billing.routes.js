@@ -6,16 +6,11 @@ import {
     getBillingById,
 } from './billing.controller.js';
 import { validateJWT } from '../../middlewares/validate-jwt.js';
+import { hasRole } from '../../middlewares/role-validator.js';
 
 const router = Router();
 
-// --- RUTAS PROTEGIDAS POR JWT ---
-
-// Obtener todas las facturas (Admin/Empleado ve todas, Customer solo las suyas)
-router.get('/', validateJWT, getBillings);
-
-// Obtener una factura específica
-router.get('/:id', validateJWT, getBillingById);
-
+router.get('/', validateJWT, hasRole('CLIENT'), getBillings);
+router.get('/:id', validateJWT, hasRole('CLIENT'), getBillingById);
 
 export default router;

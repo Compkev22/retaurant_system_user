@@ -4,6 +4,13 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema({
+    // ── Vínculo con AuthService (Postgres) ─────────────────────────
+    authId: {
+        type: String,
+        unique: true,
+        sparse: true, // permite null para usuarios legados
+        index: true,
+    },
     UserName: {
         type: String,
         required: [true, 'El nombre es requerido'],
@@ -24,13 +31,20 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
     },
     password: {
+        // Ya no es la fuente de verdad (eso lo maneja el Auth-Service),
+        // pero se mantiene para compatibilidad con el esquema/index local.
         type: String,
-        required: [true, 'La contraseña es requerida']
+        required: false,
+        select: false,
     },
     role: {
         type: String,
         enum: ['PLATFORM_ADMIN', 'BRANCH_ADMIN', 'EMPLOYEE', 'CLIENT'],
         default: 'CLIENT'
+    },
+    phone: {
+        type: String,
+        trim: true,
     },
     UserStatus: {
         type: String,
@@ -51,9 +65,9 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-// Middleware que incripta la contraseña antes de guardarla
+// Encripta la contraseña solo si viene presente (sincronización opcional)
 userSchema.pre('save', async function () {
-    if (!this.isModified('password')) return;
+    if (!this.isModified('password') || !this.password) return;
 
     try {
         const salt = await bcrypt.genSalt(10);
@@ -63,12 +77,11 @@ userSchema.pre('save', async function () {
     }
 });
 
-// Metodo para comparar las contraseñas
 userSchema.methods.comparePassword = async function (candidatePassword) {
+    if (!this.password) return false;
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Limpia el JSON de respuesta (Seguridad para no enviar password)
 userSchema.methods.toJSON = function () {
     const { __v, password, _id, ...user } = this.toObject();
     user.uid = _id;

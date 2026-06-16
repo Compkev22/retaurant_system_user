@@ -1,6 +1,6 @@
 'use strict';
 
-import { body } from 'express-validator';
+import { body, param } from 'express-validator';
 import { checkValidators } from './check.validators.js'; 
 
 export const createCouponValidator = [
@@ -17,7 +17,7 @@ export const createCouponValidator = [
         
     body('expirationDate', 'Debe ser una fecha válida y futura')
         .notEmpty()
-        .isISO8601() // Valida formato YYYY-MM-DD
+        .isISO8601() 
         .toDate()
         .custom((value) => {
             if (value < new Date()) {
@@ -28,6 +28,42 @@ export const createCouponValidator = [
 
     body('usageLimit', 'El límite de uso debe ser un número entero mayor a 0')
         .notEmpty()
+        .isInt({ min: 1 }),
+
+    body('description', 'La descripción no puede exceder los 100 caracteres')
+        .optional()
+        .isString()
+        .isLength({ max: 100 }),
+
+    checkValidators 
+];
+
+export const updateCouponValidator = [
+    param('id', 'No es un ID válido de MongoDB').isMongoId(),
+    
+    body('code', 'El código debe tener entre 3 y 15 caracteres')
+        .optional()
+        .isString()
+        .trim()
+        .isLength({ min: 3, max: 15 }),
+    
+    body('discountPercentage', 'El porcentaje debe ser un número entre 1 y 100')
+        .optional()
+        .isFloat({ min: 1, max: 100 }),
+        
+    body('expirationDate', 'Debe ser una fecha válida y futura')
+        .optional()
+        .isISO8601() 
+        .toDate()
+        .custom((value) => {
+            if (value && value < new Date()) {
+                throw new Error('La fecha de expiración no puede ser en el pasado');
+            }
+            return true;
+        }),
+
+    body('usageLimit', 'El límite de uso debe ser un número entero mayor a 0')
+        .optional()
         .isInt({ min: 1 }),
 
     body('description', 'La descripción no puede exceder los 100 caracteres')

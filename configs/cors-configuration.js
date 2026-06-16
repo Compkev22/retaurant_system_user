@@ -4,7 +4,7 @@ const corsOptions = {
     //Permite que la API envie y reciba cookies
     credential: true,
     //Especifica los metodos HTTP permitidos
-    methods: "GET,POST,PUT,DELETE",
+    methods: "GET,POST,PUT,DELETE,PATCH",
     //Especifica los encabezados permitidos
     allowedHeaders: "Content-Type,Authorization",
 };

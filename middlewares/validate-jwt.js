@@ -1,10 +1,8 @@
 'use strict';
 
 import jwt from 'jsonwebtoken';
-import User from '../src/User/user.model.js';
 
 export const validateJWT = async (req, res, next) => {
-
     try {
         const token =
             req.header('x-token') ||
@@ -12,42 +10,49 @@ export const validateJWT = async (req, res, next) => {
 
         if (!token) {
             return res.status(401).json({
-                message: 'No hay token en la petición'
+                success: false,
+                message: 'No se proporcionó un token',
+                error: 'MISSING_TOKEN',
             });
         }
 
+        // El SECRET_KEY debe ser el mismo que usa el Auth-Service de C#
         const decoded = jwt.verify(token, process.env.SECRET_KEY);
-        const userId = decoded.uid || decoded.sub;
 
-        if (!userId) {
-            return res.status(401).json({
-                message: 'Token inválido: sin identificador de usuario'
-            });
-        }
+        // Extraemos el ID y el Role inyectados desde el Auth-Service (.NET)
+        const userId = decoded.uid || decoded.sub || decoded.id;
+        const userRole = decoded.role || 'CLIENT';
 
-        // Buscar usuario en MongoDB
-        const user = await User.findById(userId);
+        // Saltamos la búsqueda en MongoDB: el ID de Postgres no es un ObjectId válido.
+        // La resolución al perfil local (Mongo) se hace por 'authId' donde se necesite.
+        req.user = {
+            id: userId,
+            role: userRole,
+        };
 
-        if (!user) {
-            return res.status(401).json({
-                message: 'Token no válido - Usuario inexistente'
-            });
-        }
-
-        if (user.UserStatus === 'INACTIVE') {
-            return res.status(401).json({ message: 'Usuario inactivo' });
-        }
-
-        if (user.deletedAt) {
-            return res.status(401).json({ message: 'Usuario eliminado' });
-        }
-
-        req.user = user;
         next();
 
     } catch (error) {
-        return res.status(401).json({
-            message: 'Token no válido o expirado'
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false,
+                message: 'El token ha expirado',
+                error: 'TOKEN_EXPIRED',
+            });
+        }
+
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                message: 'Token inválido o malformado',
+                error: 'INVALID_TOKEN',
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno al validar el token',
+            error: 'TOKEN_VALIDATION_ERROR',
         });
     }
 };
