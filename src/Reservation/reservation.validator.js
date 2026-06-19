@@ -18,8 +18,14 @@ export const reservationValidator = [
         .notEmpty()
         .isMongoId(),
 
-    body('clientId', 'El cliente es obligatorio')
+    body('tableId', 'Debes seleccionar una mesa')
         .notEmpty()
+        .isMongoId(),
+
+    // clientId ya no es obligatorio en el body: el CLIENT lo trae de su propio JWT.
+    // Solo lo manda el EMPLOYEE/ADMIN al reservar a nombre de alguien más.
+    body('clientId')
+        .optional()
         .isMongoId(),
 
     body('date', 'La fecha es obligatoria')
