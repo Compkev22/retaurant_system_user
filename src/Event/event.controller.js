@@ -1,7 +1,8 @@
 'use strict';
 
 import Event from './event.model.js';
-import Table from '../Table/table.model.js'
+import Table from '../Table/table.model.js';
+import Reservation from '../Reservation/reservation.model.js';
 
 //TODOS
 export const getEvents = async (req, res) => {
