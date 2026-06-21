@@ -7,15 +7,20 @@ import OrderDetail from '../OrderDetail/orderDetail.model.js';
 import Product from '../Product/product.model.js';
 import Combo from '../Combo/combo.model.js';
 import Coupon from '../Coupon/coupon.model.js';
+import User from '../User/user.model.js';
 
 /**
  * CLIENTE obtiene sus pedidos
  */
 export const getMyOrderRequests = async (req, res) => {
     try {
+        const user = await User.findOne({
+            authId: req.user.id
+        });
+        const allOrders = await OrderRequest.find({});
 
         const orders = await OrderRequest.find({
-            customer: req.user._id
+            customer: user._id
         })
             .populate('order')
             .populate('branch');
@@ -56,9 +61,9 @@ export const createOrderRequest = async (req, res) => {
         let discountPercentage = 0;
 
         if (couponCode) {
-            const couponDB = await Coupon.findOne({ 
-                code: couponCode.toUpperCase(), 
-                status: 'ACTIVE' 
+            const couponDB = await Coupon.findOne({
+                code: couponCode.toUpperCase(),
+                status: 'ACTIVE'
             });
 
             if (!couponDB) {
@@ -91,10 +96,10 @@ export const createOrderRequest = async (req, res) => {
         // 2. Procesar cada item
         for (const item of items) {
             const { productoId, comboId, cantidad } = item;
-            
+
             // ... (Toda tu lógica de validación de items y creación de OrderDetail se mantiene igual)
             // Solo asegúrate de ir sumando al subtotalAcumulado
-            
+
             // Ejemplo simplificado de lo que ya tienes:
             let precioUnitario = 0;
             if (productoId) {
@@ -141,8 +146,8 @@ export const createOrderRequest = async (req, res) => {
             branch,
             order: order._id,
             orderType,
-            couponCode: couponCode ? couponCode.toUpperCase() : null, 
-            appliedCoupon: appliedCouponId, 
+            couponCode: couponCode ? couponCode.toUpperCase() : null,
+            appliedCoupon: appliedCouponId,
             deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress : undefined,
             orderStatus: 'Pendiente',
             total: totalConDescuento // El total ya tiene el descuento aplicado
