@@ -1,6 +1,22 @@
 'use strict';
 
 import Coupon from './coupon.model.js';
+import CouponUsage from '../CouponUsage/couponUsage.model.js';
+import User from '../User/user.model.js';
+
+// Devuelve {start, end} de la semana (lunes-domingo) que contiene `date`
+const getWeekRange = (date = new Date()) => {
+    const d = new Date(date);
+    const day = d.getDay(); // 0=Dom, 1=Lun...
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const start = new Date(d);
+    start.setDate(d.getDate() + diffToMonday);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+};
 
 // Listar cupones activos disponibles para el cliente
 export const getCoupons = async (req, res) => {
@@ -41,6 +57,27 @@ export const getCouponByCode = async (req, res) => {
 
         if (coupon.usedCount >= coupon.usageLimit) {
             return res.status(400).json({ success: false, message: 'El cupón alcanzó su límite de uso' });
+        }
+
+        // Verificar límite semanal por cliente (1 uso por semana)
+        const userDB = await User.findOne({ authId: req.user.id });
+        if (userDB) {
+            const { start, end } = getWeekRange();
+            const usosEstaSemana = await CouponUsage.countDocuments({
+                customer: userDB._id,
+                coupon: coupon._id,
+                usedAt: { $gte: start, $lte: end }
+            });
+
+            if (usosEstaSemana >= 1) {
+                // Calcular cuántos días faltan para el próximo lunes
+                const today = new Date();
+                const daysUntilMonday = today.getDay() === 0 ? 1 : 8 - today.getDay();
+                return res.status(400).json({
+                    success: false,
+                    message: `Ya usaste este cupón esta semana. Podrás volver a usarlo el próximo lunes (en ${daysUntilMonday} día${daysUntilMonday !== 1 ? 's' : ''}).`
+                });
+            }
         }
 
         res.status(200).json({ success: true, data: coupon });
