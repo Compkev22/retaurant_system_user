@@ -20,12 +20,12 @@ import { hasRole } from '../../middlewares/role-validator.js';
 
 const router = Router();
 
-router.get('/', validateJWT, hasRole('CLIENT'), getCoupons);
-router.get('/code/:code', validateJWT, hasRole('CLIENT'), getCouponByCode);
-router.get('/:id', validateJWT, hasRole('CLIENT'), getCouponById);
+router.get('/',            validateJWT, hasRole('CLIENT', 'ADMIN'), getCoupons);
+router.get('/code/:code',  validateJWT, hasRole('CLIENT', 'ADMIN'), getCouponByCode);
+router.get('/:id',         validateJWT, hasRole('CLIENT', 'ADMIN'), getCouponById);
 
-router.post('/', validateJWT, hasRole('CLIENT'), createCouponValidator, createCoupon);
-router.put('/:id', validateJWT, hasRole('CLIENT'), updateCouponValidator, updateCoupon);
-router.patch('/:id/status', validateJWT, hasRole('CLIENT'), toggleCouponStatus);
+router.post('/',            validateJWT, hasRole('ADMIN'), createCouponValidator, createCoupon);
+router.put('/:id',          validateJWT, hasRole('ADMIN'), updateCouponValidator, updateCoupon);
+router.patch('/:id/status', validateJWT, hasRole('ADMIN'), toggleCouponStatus);
 
 export default router;
