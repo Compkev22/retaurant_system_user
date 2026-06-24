@@ -19,7 +19,8 @@ export const getMenu = async (req, res) => {
                 name: product.nombre,   
                 description: product.descripcion || 'Sin descripción', 
                 category: product.categoria,
-                price: product.precio,  
+                price: product.precio, 
+                imagen_url: product.imagen_url,
                 type: 'Individual'
             })),
             ...combos.map(combo => ({
@@ -28,6 +29,7 @@ export const getMenu = async (req, res) => {
                 description: combo.ComboDescription, 
                 price: combo.ComboPrice,            
                 category: 'Combos',
+                image: combo.image || null, 
                 type: 'Combo'
             }))
         ];
