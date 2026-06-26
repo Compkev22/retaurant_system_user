@@ -56,6 +56,30 @@ export const validateUpdateUserRequest = [
         .isIn(['ACTIVE', 'INACTIVE'])
         .withMessage('Estado no válido'),
 
+    body('addresses')
+        .optional({ nullable: true })
+        .isArray({ max: 2 })
+        .withMessage('Solo puedes guardar hasta 2 direcciones favoritas'),
+
+    body('addresses.*.label')
+        .trim()
+        .notEmpty()
+        .withMessage('El nombre de la dirección es requerido')
+        .isLength({ max: 30 })
+        .withMessage('El nombre no puede tener más de 30 caracteres'),
+
+    body('addresses.*.address')
+        .trim()
+        .notEmpty()
+        .withMessage('La dirección es requerida')
+        .isLength({ max: 200 })
+        .withMessage('La dirección no puede tener más de 200 caracteres'),
+
+    body('addresses.*.isDefault')
+        .optional()
+        .isBoolean()
+        .withMessage('isDefault debe ser booleano'),
+
     checkValidators,
 ];
 

@@ -62,6 +62,31 @@ const userSchema = new mongoose.Schema({
     UserCreatedAt: {
         type: Date,
         default: Date.now
+    },
+    addresses: {
+        type: [{
+            label: {
+                type: String,
+                required: [true],
+                trim: true,
+                maxlength: [30, 'El nombre no puede tener más de 30 caracteres']
+            },
+            address: {
+                type: String,
+                required: [true],
+                trim: true,
+                maxlength: [200, 'La dirección no puede tener más de 200 caracteres']
+            },
+            isDefault: {
+                type: Boolean,
+                default: false
+            }
+        }],
+        validate: {
+            validator: (addresses) => addresses === null || addresses.length <= 2,
+            message: 'Solo puedes guardar hasta 2 direcciones favoritas'
+        },
+        default: null
     }
 });
 
@@ -85,6 +110,9 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toJSON = function () {
     const { __v, password, _id, ...user } = this.toObject();
     user.uid = _id;
+    user.addresses = Array.isArray(user.addresses)
+        ? user.addresses.map(({ _id, ...addr }) => ({ ...addr, addressId: _id }))
+        : null;
     return user;
 };
 

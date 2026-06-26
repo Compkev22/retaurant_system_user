@@ -20,11 +20,27 @@ export const getProfile = async (req, res) => {
 /* ACTUALIZAR PERFIL DEL CLIENTE AUTENTICADO */
 export const updateUser = async (req, res) => {
     try {
-        const allowedFields = ['UserName', 'UserSurname', 'phone'];
+        const allowedFields = ['UserName', 'UserSurname', 'phone', 'addresses'];
         const updates = {};
 
         for (const field of allowedFields) {
             if (req.body[field] !== undefined) updates[field] = req.body[field];
+        }
+
+        if (Array.isArray(updates.addresses)) {
+            if (updates.addresses.length > 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Solo puedes guardar hasta 2 direcciones favoritas',
+                });
+            }
+
+            let defaultSeen = false;
+            updates.addresses = updates.addresses.map((addr) => {
+                const isDefault = !defaultSeen && !!addr.isDefault;
+                if (isDefault) defaultSeen = true;
+                return { label: addr.label, address: addr.address, isDefault };
+            });
         }
 
         const user = await User.findOneAndUpdate(

@@ -7,15 +7,21 @@ import OrderDetail from '../OrderDetail/orderDetail.model.js';
 import Product from '../Product/product.model.js';
 import Combo from '../Combo/combo.model.js';
 import Coupon from '../Coupon/coupon.model.js';
+import CouponUsage from '../CouponUsage/couponUsage.model.js';
+import User from '../User/user.model.js';
 
 /**
  * CLIENTE obtiene sus pedidos
  */
 export const getMyOrderRequests = async (req, res) => {
     try {
+        const user = await User.findOne({
+            authId: req.user.id
+        });
+        const allOrders = await OrderRequest.find({});
 
         const orders = await OrderRequest.find({
-            customer: req.user._id
+            customer: user._id
         })
             .populate('order')
             .populate('branch');
@@ -40,7 +46,12 @@ export const getMyOrderRequests = async (req, res) => {
 export const createOrderRequest = async (req, res) => {
     try {
         const { branch, orderType, deliveryAddress, items, couponCode } = req.body;
-        const customer = req.user._id;
+
+        const userDB = await User.findOne({ authId: req.user.id });
+        if (!userDB) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+        const customer = userDB._id;
 
         if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({
@@ -56,9 +67,9 @@ export const createOrderRequest = async (req, res) => {
         let discountPercentage = 0;
 
         if (couponCode) {
-            const couponDB = await Coupon.findOne({ 
-                code: couponCode.toUpperCase(), 
-                status: 'ACTIVE' 
+            const couponDB = await Coupon.findOne({
+                code: couponCode.toUpperCase(),
+                status: 'ACTIVE'
             });
 
             if (!couponDB) {
@@ -71,6 +82,31 @@ export const createOrderRequest = async (req, res) => {
 
             if (couponDB.usedCount >= couponDB.usageLimit) {
                 return res.status(400).json({ success: false, message: 'Cupón agotado' });
+            }
+
+            // Verificar que este cliente no haya usado este cupón ya esta semana
+            const now = new Date();
+            const day = now.getDay();
+            const diffToMonday = day === 0 ? -6 : 1 - day;
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() + diffToMonday);
+            startOfWeek.setHours(0, 0, 0, 0);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            const usosEstaSemana = await CouponUsage.countDocuments({
+                customer,
+                coupon: couponDB._id,
+                usedAt: { $gte: startOfWeek, $lte: endOfWeek }
+            });
+
+            if (usosEstaSemana >= 1) {
+                const daysUntilMonday = day === 0 ? 1 : 8 - day;
+                return res.status(400).json({
+                    success: false,
+                    message: `Ya usaste este cupón esta semana. Podrás volver a usarlo el próximo lunes (en ${daysUntilMonday} día${daysUntilMonday !== 1 ? 's' : ''}).`
+                });
             }
 
             appliedCouponId = couponDB._id;
@@ -91,11 +127,7 @@ export const createOrderRequest = async (req, res) => {
         // 2. Procesar cada item
         for (const item of items) {
             const { productoId, comboId, cantidad } = item;
-            
-            // ... (Toda tu lógica de validación de items y creación de OrderDetail se mantiene igual)
-            // Solo asegúrate de ir sumando al subtotalAcumulado
-            
-            // Ejemplo simplificado de lo que ya tienes:
+
             let precioUnitario = 0;
             if (productoId) {
                 const productDB = await Product.findOne({ _id: productoId, ProductStatus: 'ACTIVE' });
@@ -130,9 +162,13 @@ export const createOrderRequest = async (req, res) => {
         order.discountApplied = discountApplied;
         await order.save();
 
-        // Registrar el uso en el modelo de Cupones
+        // Registrar el uso global y el uso individual por cliente
         if (appliedCouponId) {
             await Coupon.findByIdAndUpdate(appliedCouponId, { $inc: { usedCount: 1 } });
+            await CouponUsage.create({
+                customer: customer,
+                coupon: appliedCouponId
+            });
         }
 
         // 4. Crear el OrderRequest vinculado
@@ -141,11 +177,11 @@ export const createOrderRequest = async (req, res) => {
             branch,
             order: order._id,
             orderType,
-            couponCode: couponCode ? couponCode.toUpperCase() : null, 
-            appliedCoupon: appliedCouponId, 
+            couponCode: couponCode ? couponCode.toUpperCase() : null,
+            appliedCoupon: appliedCouponId,
             deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress : undefined,
             orderStatus: 'Pendiente',
-            total: totalConDescuento // El total ya tiene el descuento aplicado
+            total: totalConDescuento
         });
 
         res.status(201).json({

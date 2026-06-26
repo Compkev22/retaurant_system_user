@@ -3,6 +3,8 @@
 import Review from './review.model.js';
 import Order from '../Order/order.model.js';
 import OrderRequest from '../OrderRequest/orderRequest.model.js';
+import User from '../User/user.model.js';
+import mongoose from 'mongoose';
 
 /* -----------------------------------------
    CREAR RESEÑA
@@ -10,7 +12,19 @@ import OrderRequest from '../OrderRequest/orderRequest.model.js';
 export const createReview = async (req, res) => {
     try {
         const { orderRequestId, rating, comment } = req.body;
-        const customerId = req.user._id;
+
+        const user = await User.findOne({
+            authId: req.user.id
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        const customerId = user._id;
 
         // BUSCAR el pedido (No crearlo)
         const orderReq = await OrderRequest.findById(orderRequestId);
@@ -38,10 +52,41 @@ export const createReview = async (req, res) => {
             });
         }
 
+        // Si ya existe una reseña (activa o eliminada) para este pedido,
+        // el índice único {customer, order} impide crear una nueva.
+        // En vez de fallar, reactivamos y actualizamos la existente.
+        const existingReview = await Review.findOne({
+            customer: customerId,
+            order: orderReq.order
+        });
+
+        if (existingReview) {
+
+            if (!existingReview.isDeleted) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Ya has dejado una reseña para este pedido'
+                });
+            }
+
+            existingReview.isDeleted = false;
+            existingReview.rating = rating;
+            existingReview.comment = comment;
+            existingReview.branch = orderReq.branch;
+
+            await existingReview.save();
+
+            return res.status(201).json({
+                success: true,
+                message: 'Reseña creada exitosamente',
+                data: existingReview
+            });
+        }
+
         // CREAR la RESEÑA (Aquí es donde se usa Review.create)
         const review = await Review.create({
             customer: customerId,
-            order: orderReq.order, 
+            order: orderReq.order,
             branch: orderReq.branch,
             rating,
             comment
@@ -73,12 +118,21 @@ export const createReview = async (req, res) => {
 ------------------------------------------*/
 export const getMyReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({
-            customer: req.user._id,
-            isDeleted: false
-        })
-            .populate('order', 'estado total')
-            .populate('branch', 'name');
+
+        const user = await User.findOne({
+            authId: req.user.id
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        const reviews = await Review.find({ customer: user._id })
+            .populate('branch', 'name')
+            .populate('order');
 
         res.status(200).json({
             success: true,
@@ -106,16 +160,30 @@ export const updateReview = async (req, res) => {
         const { id } = req.params;
         const { rating, comment } = req.body;
 
-        const review = await Review.findOne({
-            _id: id,
-            customer: req.user._id,
-            isDeleted: false
+        const user = await User.findOne({
+            authId: req.user.id
         });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        const review = await Review.findById(id);
 
         if (!review) {
             return res.status(404).json({
                 success: false,
                 message: 'Reseña no encontrada'
+            });
+        }
+
+        if (review.customer.toString() !== user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'No tienes permiso para editar esta reseña'
             });
         }
 
@@ -139,15 +207,26 @@ export const updateReview = async (req, res) => {
     }
 };
 
-
 /* -----------------------------------------
    ELIMINAR RESEÑA (SOFT DELETE)
 ------------------------------------------*/
 export const deleteReview = async (req, res) => {
     try {
         const { id } = req.params;
+
+        const user = await User.findOne({
+            authId: req.user.id
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
         const userRole = req.user.role;
-        const userId = req.user._id;
+        const userId = user._id;
 
         // Buscamos la reseña
         const review = await Review.findById(id);
@@ -172,7 +251,7 @@ export const deleteReview = async (req, res) => {
         }
 
         review.isDeleted = !review.isDeleted;
-        
+
         await review.save();
 
         // 4. Respuesta dinámica según el nuevo estado
