@@ -21,12 +21,6 @@ export const validateCreateEvent = [
         .isMongoId()
         .withMessage('La sucursal debe ser un ObjectId válido'),
 
-    body('clientId')
-        .notEmpty()
-        .withMessage('El cliente es obligatorio')
-        .isMongoId()
-        .withMessage('El cliente debe ser un ObjectId válido'),
-
     body('name')
         .trim()
         .notEmpty()
@@ -41,10 +35,9 @@ export const validateCreateEvent = [
         .withMessage('La fecha debe tener formato válido (YYYY-MM-DD)')
         .toDate()
         .custom((value) => {
-            const today = new Date();
             const minDate = new Date();
-            // Sumamos exactamente 1 mes a la fecha actual
-            minDate.setMonth(today.getMonth() + 1);
+            minDate.setMonth(minDate.getMonth() + 1);
+            minDate.setHours(0, 0, 0, 0); // zerear hora para comparar solo fechas
 
             if (value < minDate) {
                 throw new Error('La fecha del evento debe ser al menos con 1 mes de anticipación');
@@ -124,6 +117,7 @@ export const validateUpdateEventRequest = [
             const today = new Date();
             const minDate = new Date();
             minDate.setMonth(today.getMonth() + 1);
+            minDate.setHours(0, 0, 0, 0); // zerear hora para comparar solo fechas
             if (value < minDate) {
                 throw new Error('La fecha actualizada debe mantener el margen de 1 mes de anticipación');
             }

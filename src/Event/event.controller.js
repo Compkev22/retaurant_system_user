@@ -3,6 +3,7 @@
 import Event from './event.model.js';
 import Table from '../Table/table.model.js';
 import Reservation from '../Reservation/reservation.model.js';
+import User from '../User/user.model.js';
 
 //TODOS
 export const getEvents = async (req, res) => {
@@ -12,7 +13,8 @@ export const getEvents = async (req, res) => {
         const filter = {};
 
         if (req.user.role === 'CLIENT') {
-            filter.status = 'ACTIVE';
+            const localUser = await User.findOne({ authId: req.user.id });
+            if (localUser) filter.clientId = localUser._id;
         } else if (req.user.role === 'BRANCH_ADMIN') {
             filter.branchId = req.user.branchId;
             if (req.query.status) filter.status = req.query.status;
@@ -81,11 +83,15 @@ export const getEventById = async (req, res) => {
     }
 };
 
-//SOLO PLATFORM_ADMIN
 export const createEvent = async (req, res) => {
     try {
         const { branchId, eventDate, startTime, endTime, numberOfPersons, name, additionalServices, notes } = req.body;
-        const clientId = req.user._id;
+        const localUser = await User.findOne({ authId: req.user.id });
+        const clientId = localUser?._id;
+
+        if (!clientId) {
+            return res.status(401).json({ success: false, message: 'Usuario no encontrado.' });
+        }
 
         const dateFilter = new Date(eventDate);
 
@@ -93,7 +99,7 @@ export const createEvent = async (req, res) => {
         const overlappingEvents = await Event.find({
             branchId,
             eventDate: dateFilter,
-            status: { $ne: 'Cancelado' }, 
+            status: { $ne: 'Cancelado' },
             $or: [
                 { startTime: { $lt: endTime }, endTime: { $gt: startTime } }
             ]
@@ -119,12 +125,12 @@ export const createEvent = async (req, res) => {
             branchId,
             TableStatus: 'ACTIVE',
             availability: { $ne: 'Mantenimiento' },
-            _id: { $nin: occupiedTableIds } 
-        }).sort({ capacity: -1 }); 
+            _id: { $nin: occupiedTableIds }
+        }).sort({ capacity: -1 });
 
         // VALIDAR CAPACIDAD TOTAL RESTANTE
         const totalCapacity = availableTables.reduce((acc, table) => acc + table.capacity, 0);
-        
+
         if (totalCapacity < numberOfPersons) {
             return res.status(400).json({
                 success: false,
@@ -141,7 +147,7 @@ export const createEvent = async (req, res) => {
                 assignedTables.push(table._id);
                 accumulatedCapacity += table.capacity;
             } else {
-                break; 
+                break;
             }
         }
 
