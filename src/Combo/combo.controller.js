@@ -3,13 +3,17 @@ import Combo from './combo.model.js';
 // Obtener combos (Vista Cliente)
 export const getCombos = async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
 
-        // Filtro estricto: Solo lo que está a la venta y activo
-        const filter = { 
-            ComboStatus: 'ACTIVE', 
-            status: 'Disponible' 
+        const { page = 1, limit = 10, branchId } = req.query;
+
+        const filter = {
+            ComboStatus: 'ACTIVE',
+            status: 'Disponible'
         };
+
+        if (branchId) {
+            filter['Branches.BranchId'] = branchId;
+        }
 
         const combos = await Combo.find(filter)
             .populate('Products.ProductId', 'nombre imagen_url precio') // Solo info pública

@@ -3,33 +3,45 @@ import Combo from '../Combo/combo.model.js';
 
 export const getMenu = async (req, res) => {
     try {
-        const products = await Product.find({ 
-            estado: 'Disponible', 
-            ProductStatus: 'ACTIVE' 
-        });
+        const { branchId } = req.query;
 
-        const combos = await Combo.find({ 
+        const productFilter = {
+            estado: 'Disponible',
+            ProductStatus: 'ACTIVE'
+        };
+
+        if (branchId) {
+            productFilter['Branches.BranchId'] = branchId;
+        }
+
+        const products = await Product.find(productFilter);
+
+        const comboFilter = {
             status: 'Disponible',
-            ComboStatus: 'ACTIVE' 
-        });
+            ComboStatus: 'ACTIVE'
+        };
+        if (branchId) {
+            comboFilter['Branches.BranchId'] = branchId;
+        }
+        const combos = await Combo.find(comboFilter);
 
         const menu = [
             ...products.map(product => ({
                 _id: product._id,
-                name: product.nombre,   
-                description: product.descripcion || 'Sin descripción', 
+                name: product.nombre,
+                description: product.descripcion || 'Sin descripción',
                 category: product.categoria,
-                price: product.precio, 
+                price: product.precio,
                 imagen_url: product.imagen_url,
                 type: 'Individual'
             })),
             ...combos.map(combo => ({
                 _id: combo._id,
-                name: combo.ComboName,              
-                description: combo.ComboDescription, 
-                price: combo.ComboPrice,            
+                name: combo.ComboName,
+                description: combo.ComboDescription,
+                price: combo.ComboPrice,
                 category: 'Combos',
-                image: combo.image || null, 
+                image: combo.image || null,
                 type: 'Combo'
             }))
         ];

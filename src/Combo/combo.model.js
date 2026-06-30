@@ -22,6 +22,13 @@ const comboSchema = new mongoose.Schema({
             min: [1, 'La cantidad mínima es 1']
         }
     }],
+    Branches: [{
+    BranchId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+        required: true
+    }
+    }],
     status: {
         type: String,
         enum: ['Disponible', 'Agotado', 'Descontinuado'],
@@ -49,7 +56,8 @@ const comboSchema = new mongoose.Schema({
     image: {
     url: { type: String, default: null },
     public_id: { type: String, default: null }
-},
+    },
+
 
     deletedAt: {
         type: Date,
