@@ -5,21 +5,28 @@ import OrderDetail from './orderDetail.model.js';
 import Product from '../Product/product.model.js';
 import Combo from '../Combo/combo.model.js';
 import Inventory from '../Inventory/inventory.model.js';
-
-
+import OrderRequest from '../OrderRequest/orderRequest.model.js';
+import User from '../User/user.model.js';
 
 export const getOrderDetailsByOrder = async (req, res) => {
     try {
         const { orderId } = req.params;
 
-        if (req.user.role === 'CLIENT') {
-            if (order.clientId?.toString() !== req.user._id.toString()) {
-                return res.status(403).json({ success: false, message: 'No autorizado' });
-            }
-        } else if (!['PLATFORM_ADMIN', 'BRANCH_ADMIN', 'EMPLOYEE'].includes(req.user.role)) {
-            return res.status(403).json({ success: false, message: 'No autorizado' });
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Orden no encontrada' });
         }
 
+        if (req.user.role === 'CLIENT') {
+            const userDB = await User.findOne({ authId: req.user.id });
+            if (!userDB) {
+                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+            }
+            const orderRequest = await OrderRequest.findOne({ order: orderId, customer: userDB._id });
+            if (!orderRequest) {
+                return res.status(403).json({ success: false, message: 'No autorizado' });
+            }
+        }
 
         const details = await OrderDetail.find({ order: orderId })
             .populate('productoId')

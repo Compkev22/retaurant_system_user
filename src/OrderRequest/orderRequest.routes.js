@@ -4,7 +4,8 @@ import { Router } from 'express';
 import {
     createOrderRequest,
     getMyOrderRequests,
-    cancelOrderRequest
+    cancelOrderRequest,
+    payOrderRequest
 } from './orderRequest.controller.js';
 
 import { validateJWT } from '../../middlewares/validate-jwt.js';
@@ -38,6 +39,13 @@ router.put(
     validateJWT,
     hasRole('CLIENT'),
     cancelOrderRequest
+);
+// Pagar pedido
+router.patch(
+    '/pay/:id',
+    validateJWT,
+    hasRole('CLIENT'),
+    payOrderRequest
 );
 
 
