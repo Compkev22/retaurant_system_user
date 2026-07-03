@@ -93,6 +93,17 @@ export const createEvent = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Usuario no encontrado.' });
         }
 
+        const activeEventsCount = await Event.countDocuments({
+            clientId,
+            status: { $in: ['Pendiente', 'Confirmado'] }
+        });
+        if (activeEventsCount >= 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Has alcanzado el límite de 5 eventos activos. Espera a que alguno se complete o cancela uno para poder solicitar otro.'
+            });
+        }
+
         const dateFilter = new Date(eventDate);
 
         // BUSCAR MESAS OCUPADAS POR OTROS EVENTOS (Misma fecha y choque de horas)

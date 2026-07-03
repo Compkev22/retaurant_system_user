@@ -64,7 +64,7 @@ export const getTableAvailability = async (req, res) => {
         const reservationDate = new Date(date);
 
         const occupiedTableIds = await findOccupiedTableIds(branchId, reservationDate, time);
-        
+
         const tables = await Table.find({
             branchId,
             TableStatus: 'ACTIVE',
@@ -113,6 +113,33 @@ export const saveReservation = async (req, res) => {
             return res.status(400).send({
                 success: false,
                 message: 'El ID del cliente es requerido.'
+            });
+        }
+
+        const activeReservationsCount = await Reservation.countDocuments({
+            clientId,
+            statusRes: 'ACTIVADO',
+            status: { $in: ['Pendiente', 'Confirmada'] }
+        });
+        if (activeReservationsCount >= 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Has alcanzado el límite de 5 reservaciones activas. Espera a que alguna se complete o cancela una para poder hacer otra.'
+            });
+        }
+
+        const existingReservation = await Reservation.findOne({
+            clientId,
+            date: new Date(date),
+            time,
+            statusRes: 'ACTIVADO',
+            status: { $in: ['Pendiente', 'Confirmada'] }
+        });
+
+        if (existingReservation) {
+            return res.status(409).json({
+                success: false,
+                message: 'Ya tienes una reservación activa para esa fecha y hora. No puedes hacer dos reservaciones en el mismo horario.'
             });
         }
 
@@ -223,10 +250,10 @@ export const updateReservation = async (req, res) => {
         if (!reservation) return res.status(404).send({ success: false, message: 'No encontrada' });
 
         // Validación de permisos
-        if (req.user.role === 'CLIENT') {
+        if (req.user.role === 'CLIENT' && reservation.status !== 'Pendiente') {
             const localUser = await User.findOne({ authId: req.user.id });
             if (reservation.clientId?.toString() !== localUser?._id?.toString()) {
-                return res.status(403).send({ success: false, message: 'No autorizado' });
+                return res.status(403).send({ success: false, message: 'Solo puedes editar reservaciones que aún estén en estado Pendiente.' });
             }
         }
 
