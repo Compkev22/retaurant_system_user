@@ -46,6 +46,17 @@ const billingSchema = new mongoose.Schema({
         type: String,
         enum: ['GENERATED', 'PAYED'],
         default: 'GENERATED'
+    },
+    BillNIT: {
+        type: String,
+        trim: true,
+        default: 'CF'
+    },
+    BillEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: null
     }
 }, { 
     versionKey: false, 
