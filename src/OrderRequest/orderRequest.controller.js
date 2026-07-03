@@ -9,6 +9,8 @@ import Combo from '../Combo/combo.model.js';
 import Coupon from '../Coupon/coupon.model.js';
 import CouponUsage from '../CouponUsage/couponUsage.model.js';
 import User from '../User/user.model.js';
+import Billing from '../Billing/billing.model.js';
+import Inventory from '../Inventory/inventory.model.js';
 
 /**
  * CLIENTE obtiene sus pedidos
@@ -24,7 +26,8 @@ export const getMyOrderRequests = async (req, res) => {
             customer: user._id
         })
             .populate('order')
-            .populate('branch');
+            .populate('branch')
+            .sort({ createdAt: -1 });
 
         res.status(200).json({
             success: true,
@@ -45,7 +48,7 @@ export const getMyOrderRequests = async (req, res) => {
 
 export const createOrderRequest = async (req, res) => {
     try {
-        const { branch, orderType, deliveryAddress, items, couponCode } = req.body;
+        const { branch, orderType, deliveryAddress, deliveryLat, deliveryLng, items, couponCode, nit, billEmail } = req.body;
 
         const userDB = await User.findOne({ authId: req.user.id });
         if (!userDB) {
@@ -119,24 +122,54 @@ export const createOrderRequest = async (req, res) => {
             orderType,
             coupon: appliedCouponId,
             total: 0,
-            estado: 'Pendiente'
+            estado: 'En Preparacion',
+            isPaid: true
         });
 
         let subtotalAcumulado = 0;
 
-        // 2. Procesar cada item
+        // 2. Validar stock y procesar cada item
         for (const item of items) {
             const { productoId, comboId, cantidad } = item;
 
             let precioUnitario = 0;
             if (productoId) {
-                const productDB = await Product.findOne({ _id: productoId, ProductStatus: 'ACTIVE' });
+                const productDB = await Product.findOne({ _id: productoId, ProductStatus: 'ACTIVE' })
+                    .populate('ingredientes.inventoryId');
                 if (!productDB) throw new Error(`Producto no encontrado: ${productoId}`);
+
+                // Validar stock de ingredientes
+                for (const ing of productDB.ingredientes || []) {
+                    const inv = ing.inventoryId;
+                    if (!inv) throw new Error(`Ingrediente invalido en ${productDB.nombre}`);
+                    const needed = ing.cantidadUsada * cantidad;
+                    if (inv.stock < needed) {
+                        throw new Error(`Stock insuficiente para ${productDB.nombre}. Disponible: ${inv.stock}, Requerido: ${needed}`);
+                    }
+                }
+
                 precioUnitario = productDB.precio || 0;
             } else if (comboId) {
-                const comboDB = await Combo.findOne({ _id: comboId, ComboStatus: 'ACTIVE' });
+                const comboDB = await Combo.findOne({ _id: comboId, ComboStatus: 'ACTIVE' })
+                    .populate({ path: 'ComboList.productId', populate: { path: 'ingredientes.inventoryId' } });
                 if (!comboDB) throw new Error(`Combo no encontrado: ${comboId}`);
-                precioUnitario = (comboDB.ComboPrice || 0) - (comboDB.ComboDiscount || 0);
+
+                // Validar stock de todos los productos del combo
+                for (const comboItem of comboDB.ComboList || []) {
+                    const product = comboItem.productId;
+                    if (!product) throw new Error(`Producto del combo no encontrado`);
+                    const comboItemQty = comboItem.cantidad || 1;
+                    for (const ing of product.ingredientes || []) {
+                        const inv = ing.inventoryId;
+                        if (!inv) throw new Error(`Ingrediente invalido en ${product.nombre}`);
+                        const needed = ing.cantidadUsada * comboItemQty * cantidad;
+                        if (inv.stock < needed) {
+                            throw new Error(`Stock insuficiente para ${product.nombre} (combo ${comboDB.ComboName}). Disponible: ${inv.stock}, Requerido: ${needed}`);
+                        }
+                    }
+                }
+
+                precioUnitario = comboDB.ComboPrice || 0;
             }
 
             const subtotalItem = precioUnitario * cantidad;
@@ -180,8 +213,31 @@ export const createOrderRequest = async (req, res) => {
             couponCode: couponCode ? couponCode.toUpperCase() : null,
             appliedCoupon: appliedCouponId,
             deliveryAddress: orderType === 'DELIVERY' ? deliveryAddress : undefined,
-            orderStatus: 'Pendiente',
+            deliveryLat: orderType === 'DELIVERY' ? deliveryLat : null,
+            deliveryLng: orderType === 'DELIVERY' ? deliveryLng : null,
+            orderStatus: 'En Preparacion',
+            paymentStatus: 'PAID',
             total: totalConDescuento
+        });
+
+        // 5. Crear Billing automaticamente (el cliente ya pago con tarjeta)
+        const total = Number(totalConDescuento || 0);
+        const billSubtotal = Number((total / 1.12).toFixed(2));
+        const billIva = Number((total - billSubtotal).toFixed(2));
+
+        await Billing.create({
+            branchId: branch,
+            client: customer,
+            Order: order._id,
+            BillSerie: `FAC-${Date.now()}`,
+            BillSubtotal: billSubtotal,
+            BillIVA: billIva,
+            BillTotal: total,
+            BillPaymentMethod: 'CARD',
+            BillStatus: 'PAYED',
+            BillDate: new Date(),
+            BillNIT: nit || 'CF',
+            BillEmail: billEmail || null
         });
 
         res.status(201).json({
@@ -206,9 +262,14 @@ export const cancelOrderRequest = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const userDB = await User.findOne({ authId: req.user.id });
+        if (!userDB) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+
         const orderRequest = await OrderRequest.findOne({
             _id: id,
-            customer: req.user._id
+            customer: userDB._id
         });
 
         if (!orderRequest) {
@@ -218,10 +279,10 @@ export const cancelOrderRequest = async (req, res) => {
             });
         }
 
-        if (orderRequest.orderStatus !== 'Pendiente') {
+        if (orderRequest.orderStatus !== 'En Preparacion') {
             return res.status(400).json({
                 success: false,
-                message: 'Solo se pueden cancelar pedidos en estado Pendiente'
+                message: 'Solo se pueden cancelar pedidos en Preparación'
             });
         }
 
@@ -241,6 +302,93 @@ export const cancelOrderRequest = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error cancelling order',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * CLIENTE paga su pedido — cambia paymentStatus a PAID y crea Billing automaticamente
+ */
+export const payOrderRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const userDB = await User.findOne({ authId: req.user.id });
+        if (!userDB) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+
+        const orderRequest = await OrderRequest.findOne({
+            _id: id,
+            customer: userDB._id
+        }).populate('order').populate('branch');
+
+        if (!orderRequest) {
+            return res.status(404).json({
+                success: false,
+                message: 'Pedido no encontrado'
+            });
+        }
+
+        if (orderRequest.paymentStatus === 'PAID') {
+            return res.status(400).json({
+                success: false,
+                message: 'Este pedido ya fue pagado'
+            });
+        }
+
+        if (orderRequest.paymentStatus === 'REFUNDED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Este pedido tiene un reembolso activo'
+            });
+        }
+
+        const order = await Order.findById(orderRequest.order._id);
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Orden no encontrada'
+            });
+        }
+
+        // Calcular IVA
+        const total = Number(order.total || 0);
+        const subtotal = Number((total / 1.12).toFixed(2));
+        const iva = Number((total - subtotal).toFixed(2));
+
+        // Crear Billing automaticamente con status PAYED
+        const billing = await Billing.create({
+            branchId: orderRequest.branch._id,
+            client: userDB._id,
+            Order: order._id,
+            BillSerie: `FAC-${Date.now()}`,
+            BillSubtotal: subtotal,
+            BillIVA: iva,
+            BillTotal: total,
+            BillPaymentMethod: 'CARD',
+            BillStatus: 'PAYED',
+            BillDate: new Date()
+        });
+
+        // Actualizar paymentStatus del OrderRequest
+        orderRequest.paymentStatus = 'PAID';
+        await orderRequest.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Pago procesado y factura generada',
+            data: {
+                orderRequest,
+                billing
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error al procesar el pago',
             error: error.message
         });
     }

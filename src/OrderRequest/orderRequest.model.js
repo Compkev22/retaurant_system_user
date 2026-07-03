@@ -48,8 +48,21 @@ const orderRequestSchema = new mongoose.Schema({
             ],
             default: 'Pendiente'
         },
+    paymentStatus: {
+        type: String,
+        enum: ['UNPAID', 'PAID', 'REFUNDED'],
+        default: 'UNPAID'
+    },
     deliveryAddress: {
         type: String
+    },
+    deliveryLat: {
+        type: Number,
+        default: null
+    },
+    deliveryLng: {
+        type: Number,
+        default: null
     },
 
     total: {

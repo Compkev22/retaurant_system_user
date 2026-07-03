@@ -16,7 +16,7 @@ export const getCombos = async (req, res) => {
         }
 
         const combos = await Combo.find(filter)
-            .populate('Products.ProductId', 'nombre imagen_url precio') // Solo info pública
+            .populate('ComboList.productId', 'nombre imagen_url precio') // Solo info pública
             .limit(limit * 1)
             .skip((page - 1) * limit);
 
@@ -37,7 +37,7 @@ export const getComboById = async (req, res) => {
     try {
         const { id } = req.params;
         const combo = await Combo.findOne({ _id: id, ComboStatus: 'ACTIVE' })
-            .populate('Products.ProductId', 'nombre descripcion imagen_url');
+            .populate('ComboList.productId', 'nombre descripcion imagen_url');
 
         if (!combo) return res.status(404).json({ success: false, message: 'Combo no disponible' });
 

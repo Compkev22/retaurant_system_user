@@ -48,6 +48,10 @@ const orderSchema = Schema({
     total: {
         type: Number,
         default: 0
+    },
+    isPaid: {
+        type: Boolean,
+        default: false
     }
 }, { versionKey: false, timestamps: true });
 
