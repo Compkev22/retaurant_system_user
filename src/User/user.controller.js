@@ -99,3 +99,22 @@ export const syncProfile = async (req, res) => {
         });
     }
 };
+
+/* DESACTIVAR PERFIL LOCAL (se llama junto con el delete-account del Auth-Service) */
+export const deactivateAccount = async (req, res) => {
+    try {
+        const user = await User.findOneAndUpdate(
+            { authId: req.user.id },
+            { UserStatus: 'INACTIVE', deletedAt: new Date() },
+            { new: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+        }
+
+        res.status(200).json({ success: true, message: 'Perfil local desactivado correctamente' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al desactivar el perfil', error: error.message });
+    }
+};

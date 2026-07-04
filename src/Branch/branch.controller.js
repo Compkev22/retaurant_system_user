@@ -6,12 +6,24 @@ import Branch from './branch.model.js';
 //Todos pueden ver
 export const getBranches = async (req, res) => {
     try {
-        const { zone, branchStatus } = req.query;
-
+        const { zone, branchStatus, search, category, minPrice, maxPrice } = req.query;
         const filter = {};
         filter.branchStatus = branchStatus || 'ACTIVE';
 
         if (zone) filter.zone = parseInt(zone);
+
+        if (category) filter.Category = category;
+
+        if (search) {
+            const regex = new RegExp(search.trim(), 'i');
+            filter.$or = [{ name: regex }, { address: regex }];
+        }
+
+        if (minPrice || maxPrice) {
+            filter.AveragePrices = {};
+            if (minPrice) filter.AveragePrices.$gte = Number(minPrice);
+            if (maxPrice) filter.AveragePrices.$lte = Number(maxPrice);
+        }
 
         const branches = await Branch.find(filter).sort({ zone: 1, name: 1 });
 

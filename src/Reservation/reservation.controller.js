@@ -128,10 +128,15 @@ export const saveReservation = async (req, res) => {
             });
         }
 
+        const requestedDate = new Date(date);
+        const startOfDay = new Date(requestedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
         const existingReservation = await Reservation.findOne({
             clientId,
-            date: new Date(date),
-            time,
+            date: { $gte: startOfDay, $lte: endOfDay },
             statusRes: 'ACTIVADO',
             status: { $in: ['Pendiente', 'Confirmada'] }
         });
@@ -139,7 +144,7 @@ export const saveReservation = async (req, res) => {
         if (existingReservation) {
             return res.status(409).json({
                 success: false,
-                message: 'Ya tienes una reservación activa para esa fecha y hora. No puedes hacer dos reservaciones en el mismo horario.'
+                message: 'Ya tienes una reservación activa para ese día. No puedes hacer más de una reservación el mismo día.'
             });
         }
 
@@ -150,7 +155,7 @@ export const saveReservation = async (req, res) => {
             });
         }
 
-        const reservationDate = new Date(date);
+        const reservationDate = new requestedDate.constructor(requestedDate.toISOString().split('T')[0]);
 
         // Validamos que la mesa exista, pertenezca a la sucursal y esté activa
         const table = await Table.findOne({
@@ -250,9 +255,14 @@ export const updateReservation = async (req, res) => {
         if (!reservation) return res.status(404).send({ success: false, message: 'No encontrada' });
 
         // Validación de permisos
-        if (req.user.role === 'CLIENT' && reservation.status !== 'Pendiente') {
+        if (req.user.role === 'CLIENT') {
             const localUser = await User.findOne({ authId: req.user.id });
-            if (reservation.clientId?.toString() !== localUser?._id?.toString()) {
+            const isOwner = reservation.clientId?.toString() === localUser?._id?.toString();
+
+            if (!isOwner) {
+                return res.status(403).send({ success: false, message: 'No autorizado.' });
+            }
+            if (reservation.status !== 'Pendiente') {
                 return res.status(403).send({ success: false, message: 'Solo puedes editar reservaciones que aún estén en estado Pendiente.' });
             }
         }

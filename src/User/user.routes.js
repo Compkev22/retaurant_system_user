@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { updateUser, getProfile, syncProfile } from './user.controller.js';
+import { updateUser, getProfile, syncProfile, deactivateAccount } from './user.controller.js';
 import { validateUpdateUserRequest } from '../../middlewares/user-validator.js';
 import { validateJWT } from '../../middlewares/validate-jwt.js';
 import { hasRole } from '../../middlewares/role-validator.js';
@@ -17,5 +17,7 @@ router.put(
     validateUpdateUserRequest,
     updateUser
 );
+
+router.delete('/me', validateJWT, hasRole('CLIENT'), deactivateAccount);
 
 export default router;
