@@ -11,7 +11,7 @@ export const getMyEventRequests = async (req, res) => {
 
         const requests = await EventRequest.find({ clientId: localUser._id })
             .populate('branchId', 'name zone')
-            .populate('additionalServices.additionalServiceId', 'name price')
+            .populate('additionalServices.additionalServiceId', 'Name AdditionalPrice')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ success: true, data: requests });
@@ -88,7 +88,7 @@ export const cancelEventRequest = async (req, res) => {
             });
         }
 
-        request.status = 'Rechazada';
+        request.status = 'Cancelada';
         await request.save();
 
         res.status(200).json({ success: true, message: 'Solicitud cancelada.', data: request });
