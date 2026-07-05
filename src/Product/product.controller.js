@@ -10,7 +10,7 @@ import mongoose from 'mongoose';
 // Obtener productos
 export const getProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 10, categoria } = req.query;
+        const { page = 1, limit = 10, categoria, branchId } = req.query;
         
         
         const filter = { 
@@ -19,6 +19,7 @@ export const getProducts = async (req, res) => {
         };
 
         if (categoria) filter.categoria = categoria;
+        if (branchId) filter['Branches.BranchId'] = branchId;
 
         const products = await Product.find(filter)
             .populate('ingredientes.inventoryId', 'name') 

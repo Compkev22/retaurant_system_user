@@ -50,8 +50,14 @@ const eventRequestSchema = new Schema({
     // Estado de la solicitud — el admin cambia esto
     status: {
         type: String,
-        enum: ['Pendiente', 'Aceptada', 'Rechazada'],
+        enum: ['Pendiente', 'Aceptada', 'Rechazada', 'Cancelada'],
         default: 'Pendiente'
+    },
+    rejectionReason: {
+        type: String,
+        trim: true,
+        maxlength: 300,
+        default: null
     }
 }, {
     timestamps: true,
