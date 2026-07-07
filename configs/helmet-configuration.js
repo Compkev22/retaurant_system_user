@@ -6,7 +6,7 @@ export const helmetConfiguration = {
             scriptSrc: ["'self'", "'unsafe-inline'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", 'data:', 'blob:'],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "http://localhost:5173", "http://localhost:5174", "http://localhost:8081"],
             fontSrc: ["'self'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],

@@ -74,21 +74,37 @@ export const syncProfile = async (req, res) => {
         const { UserName, UserSurname, UserEmail, phone } = req.body;
         const authId = req.user.id; // viene del JWT validado (Auth-Service)
 
-        const profile = await User.findOneAndUpdate(
-            { authId },
-            {
-                $set: {
-                    UserName,
-                    UserSurname,
-                    UserEmail,
-                    phone,
-                    role: 'CLIENT',
-                    isVerified: true,
-                },
-                $setOnInsert: { authId, UserCreatedAt: new Date() },
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
+        // 1. Buscar primero por authId (caso normal)
+        let profile = await User.findOne({ authId });
+
+        // 2. Si no existe por authId, buscar por email (usuario legado sin authId)
+        if (!profile && UserEmail) {
+            profile = await User.findOne({ UserEmail: UserEmail.toLowerCase().trim() });
+        }
+
+        if (profile) {
+            // Vincular/actualizar el registro existente
+            profile.authId = authId;
+            profile.UserName = UserName;
+            profile.UserSurname = UserSurname;
+            profile.UserEmail = UserEmail;
+            profile.phone = phone;
+            profile.role = 'CLIENT';
+            profile.isVerified = true;
+            await profile.save();
+        } else {
+            // No existe ni por authId ni por email: crear nuevo
+            profile = await User.create({
+                authId,
+                UserName,
+                UserSurname,
+                UserEmail,
+                phone,
+                role: 'CLIENT',
+                isVerified: true,
+                UserCreatedAt: new Date(),
+            });
+        }
 
         res.status(200).json({ success: true, data: profile });
     } catch (error) {

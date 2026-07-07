@@ -43,6 +43,9 @@ const middleware = (app) => {
 }
 
 const routes = (app) => {
+    app.get(`${BASE_URL}/health`, (req, res) => {
+        res.status(200).json({ status: 'ok', service: 'server-user' });
+    });
     app.use(`${BASE_URL}/users`, userRoutes);
     app.use(`${BASE_URL}/combos`, combosRoutes);
     app.use(`${BASE_URL}/events`, eventRoutes);
